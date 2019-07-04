@@ -237,7 +237,8 @@ public class BFTNode extends DefaultRecoverable {
         
         String[] IDs = configs.get("RECEIVERS").split("\\,");
         int[] recvs = Arrays.asList(IDs).stream().mapToInt(Integer::parseInt).toArray();
-        
+
+        //MIGUEL Receivers are the active frontends (BFTProxy) to which the node should send new blocks.
         this.receivers = new TreeSet<>();
         for (int o : recvs) {
             this.receivers.add(o);
@@ -460,7 +461,7 @@ public class BFTNode extends DefaultRecoverable {
             replicaLock.lock();
         }
     }
-    
+    //MIGUEL ? This is the function executed upon receiving a new envelope from a proxy. IS IT?
     private byte[] executeSingle(byte[] command, MessageContext msgCtx, boolean fromConsensus) {
             
         //make sure system channel is created, since we cannot do it at start up due to not having a timestamp yet

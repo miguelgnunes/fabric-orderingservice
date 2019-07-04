@@ -1,0 +1,23 @@
+<component name="libraryTable">
+  <library name="lib">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/commons-io-2.5.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/fabric-sdk-java-1.2.1-SNAPSHOT.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/juds-0.95.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/bcprov-jdk15on-160.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/bcpkix-jdk15on-160.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/logback-core-1.2.3.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/netty-all-4.1.9.Final.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/jcl-over-slf4j-1.7.25.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/BFT-SMaRt.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/core-0.1.4.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/commons-compress-1.15.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/commons-codec-1.5.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/slf4j-api-1.7.25.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/logback-classic-1.2.3.jar!/" />
+      <root url="jar://$PROJECT_DIR$/lib/protobuf-java-3.8.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

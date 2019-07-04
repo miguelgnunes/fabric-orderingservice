@@ -1,12 +1,23 @@
 FROM hyperledger/fabric-orderer:amd64-1.3.0
 
 RUN apt-get update
-RUN apt-get -y install python-software-properties debconf-utils git-all build-essential python-pip python-dev curl libc6-dev-i386 autoconf software-properties-common
-RUN add-apt-repository ppa:webupd8team/java
-RUN apt-get update
+RUN apt-get -y install python-software-properties debconf-utils git-all build-essential python-pip python-dev curl libc6-dev-i386 autoconf software-properties-common apt-utils
+#RUN add-apt-repository ppa:webupd8team/java
+#RUN apt-get update
 
-RUN echo "oracle-java8-installer shared/accepted-oracle-license-v1-1 select true" | debconf-set-selections
-RUN apt-get install -y oracle-java8-installer
+#RUN echo "oracle-java7-installer shared/accepted-oracle-license-v1-1 select true" | debconf-set-selections
+#RUN apt-get install -y oracle-java8-installer
+
+ADD temp/jdk1.8.0_211 /jdk1.8.0_211
+RUN ls
+RUN mkdir /opt/java
+RUN mv /jdk1.8.0_211 /opt/java/
+RUN ln -s /opt/java/jdk1.8.0_211/ /opt/java/current
+ENV JAVA_HOME "/opt/java/current"
+ENV PATH "$PATH:$JAVA_HOME/bin"
+RUN echo 'export JAVA_HOME=/opt/java/current' >> /etc/.profile
+RUN echo 'export PATH=$PATH:$JAVA_HOME/bin' >> /etc/.profile
+
 
 RUN curl -O https://dl.google.com/go/go1.10.3.linux-amd64.tar.gz
 RUN tar -xvf go1.10.3.linux-amd64.tar.gz
@@ -46,13 +57,13 @@ ENV FABRIC_CFG_PATH=/go/src/github.com/hyperledger/fabric/sampleconfig
 ADD temp/fabric_conf /go/src/github.com/hyperledger/fabric/sampleconfig
 ARG SYS_CHAN_NAME
 RUN .build/bin/configtxgen -profile SampleSingleMSPBFTsmart -channelID $SYS_CHAN_NAME -outputBlock ./genesisblock
-
+#
 RUN cp /go/src/github.com/hyperledger/fabric/.build/bin/orderer /usr/local/bin/orderer
 RUN cp /go/src/github.com/hyperledger/fabric/.build/bin/configtxgen /usr/local/bin/configtxgen
 
 WORKDIR /
 
-ENV JAVA_HOME=/usr/lib/jvm/java-8-oracle/
+#ENV JAVA_HOME=/usr/lib/jvm/java-8-oracle/
 
 RUN git clone https://github.com/mcfunley/juds.git
 WORKDIR /juds

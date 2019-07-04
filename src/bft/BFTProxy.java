@@ -128,14 +128,16 @@ public class BFTProxy {
             Path socket_file = FileSystems.getDefault().getPath(System.getProperty("java.io.tmpdir"), "hlf-pool-"+sendPort+".sock");
             
             Files.deleteIfExists(socket_file);
-            
+
+            //MIGUEL Receive and send server for the orderer tool, NOT THE BFT NODES
             recvServer = new  UnixDomainSocketServer(socket_file.toString(), JUDS.SOCK_STREAM, pool);
             sendServer = new ServerSocket(sendPort);
 
             FileUtils.touch(proxy_ready.toFile()); //Indicate the Go component that the java component is ready
 
             logger.info("Waiting for local connections and parameters...");
-            
+
+            //MIGUEL orderer tool receiving socket
             recvSocket = recvServer.accept();
             is = new DataInputStream(recvSocket.getInputStream());
 
@@ -155,12 +157,16 @@ public class BFTProxy {
             BatchTimeout = new TreeMap<>();
                         
             // request latest reply sequence from the ordering nodes
+            //MIGUEL sysProxy is the one used for the ordering nodes (BFT)
             sysProxy.invokeAsynchRequest(BFTCommon.assembleSignedRequest(sysProxy.getViewManager().getStaticConf().getPrivateKey(), frontendID, "SEQUENCE", "", new byte[]{}), null, TOMMessageType.ORDERED_REQUEST);
                                    
             new SenderThread().start();
                         
             logger.info("Java component is ready");
 
+            //MIGUEL golang orderer performs x connections for x channels (maybe one orderer instance per channel?).
+            // When receiving a transaction from the BFTSmart appended with the channel id, block is forwarded to appropriate outputstream.
+            //Output streams
             while (true) { // wait for the creation of new channels
             
                 sendSocket = sendServer.accept();
@@ -270,8 +276,9 @@ public class BFTProxy {
         timer.schedule(new BatchTimeout(channel), (BatchTimeout.get(channel) / 1000000));
         timers.put(channel, timer);
     }
-    
-            
+
+
+    //MIGUEL Used to receive transactions from orderer library. It packages them to format known by BFTSmart
     private static class ReceiverThread extends Thread {
         
         private int id;
@@ -328,6 +335,8 @@ public class BFTProxy {
 
                     logger.debug("Received envelope" + Arrays.toString(env) + " for channel id " + channelID + (isConfig ? " (type config)" : " (type normal)"));
 
+
+                    //MIGUEL After receiving new transaction from orderer, sends to BFT
                     this.out.invokeAsynchRequest(BFTCommon.serializeRequest(this.id, (isConfig ? "CONFIG" : "REGULAR"), channelID, env), new ReplyListener(){
 
                         private int replies = 0;
@@ -387,6 +396,7 @@ public class BFTProxy {
             }
         }
     }
+    //MIGUEL SenderThread is used to forward blocks to the hyperledger orderer tool. It packages the blocks from BFTNode to hyperledger-ready format
     private static class SenderThread extends Thread {
         
         public void run() {
