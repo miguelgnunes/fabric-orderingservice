@@ -23,6 +23,8 @@ ADD temp/startFrontend.sh ./
 
 RUN chmod +x ./startFrontend.sh
 
+#RUN apt-get -y install unzip
+#RUN unzip -l bin/orderingservice.jar
 ENTRYPOINT ["./startFrontend.sh"]
 
 CMD [""]

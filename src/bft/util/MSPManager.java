@@ -1007,9 +1007,9 @@ public class MSPManager {
                    
             long tsClient = BFTCommon.extractTimestamp(payload);
                         
-            if ((timestamp - tsClient) > timeWindow) 
+           /* if ((timestamp - tsClient) > timeWindow)
                 throw new BFTCommon.BFTException("Envelope is invalid: timestamp falls outside of the required time window");
-                        
+*/
             Common.SignatureHeader sigHeader = Common.SignatureHeader.parseFrom(payload.getHeader().getSignatureHeader());
             
             SignedData sd = new SignedData(envelope.getPayload().toByteArray(),

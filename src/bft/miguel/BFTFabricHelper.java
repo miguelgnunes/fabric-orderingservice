@@ -1,7 +1,6 @@
 package bft.miguel;
 
 import bft.util.BFTCommon;
-import bft.util.BlockCutter;
 import bft.util.ECDSAKeyLoader;
 import bft.util.MSPManager;
 import com.google.protobuf.ByteString;
@@ -25,7 +24,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.*;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -75,6 +73,14 @@ public class BFTFabricHelper {
         //@TODO This id is used to retrieve ECDSA keys. These keys are copied to BFTNode docker but not BFTProxy. This is missing
         this.id = id;
 
+        try {
+            loadConfig();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (CertificateException e) {
+            e.printStackTrace();
+        }
+
         this.logger = LoggerFactory.getLogger(BFTFabricHelper.class);
         lastBlockHeaders = new TreeMap<>();
 
@@ -91,11 +97,10 @@ public class BFTFabricHelper {
 
         BFTCommon.init(crypto);
 
+        this.mspManager = MSPManager.getInstance(mspid, sysChannel);
         try {
-            loadConfig();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (CertificateException e) {
+            newChannel(mspManager, lastBlockHeaders, this.sysChannel, this.sysGenesis, new Date().getTime());
+        } catch (BFTCommon.BFTException e) {
             e.printStackTrace();
         }
     }
@@ -225,10 +230,13 @@ public class BFTFabricHelper {
     //@TODO Is the timestamp created valid? As in, is this the only function where this timestamp will be required? Same in processSysConfig
     public Common.Block processConfig(String channelID, Common.Envelope env, Configtx.ConfigUpdateEnvelope confEnv) throws IOException, BFTCommon.BFTException, CryptoException, NoSuchProviderException, NoSuchAlgorithmException {
 
+        System.out.println("Processing config block...");
         mspManager = mspManager.clone();
 
 
-        long timestamp = new Date().getTime();
+//        long timestamp = new Date().getTime();
+        Common.Payload payload = Common.Payload.parseFrom(env.getPayload());
+        long timestamp = BFTCommon.extractTimestamp(payload);
 
         Configtx.ConfigUpdate confUpdate = Configtx.ConfigUpdate.parseFrom(confEnv.getConfigUpdate());
 
@@ -257,11 +265,12 @@ public class BFTFabricHelper {
         return block;
     }
 
-    public Common.Block processSysConfig(String channelID, Common.Envelope env, Configtx.ConfigUpdateEnvelope confEnv) throws IOException, BFTCommon.BFTException, NoSuchProviderException, NoSuchAlgorithmException, CryptoException {
+    public Common.Block processSysConfig(String channelID, Common.Envelope env, Configtx.ConfigUpdateEnvelope confEnv, Configtx.ConfigUpdate confUpdate) throws IOException, BFTCommon.BFTException, NoSuchProviderException, NoSuchAlgorithmException, CryptoException {
 
-        long timestamp = new Date().getTime();
+//        long timestamp = new Date().getTime();
+        Common.Payload payload = Common.Payload.parseFrom(env.getPayload());
+        long timestamp = BFTCommon.extractTimestamp(payload);
 
-        Configtx.ConfigUpdate confUpdate = Configtx.ConfigUpdate.parseFrom(confEnv.getConfigUpdate());
 
         mspManager.verifyPolicies(channelID, true, confUpdate.getReadSet(), confUpdate.getWriteSet(), confEnv, timestamp);
 

@@ -1,10 +1,7 @@
 package bft.miguel;
 
-import bft.BFTProxy;
-import bft.miguel.proto.Envelopewrapper;
 import bft.util.BFTCommon;
 import bftsmart.tom.AsynchServiceProxy;
-import bftsmart.tom.core.messages.TOMMessageType;
 import bftsmart.tom.util.KeyLoader;
 import com.etsy.net.JUDS;
 import com.etsy.net.UnixDomainSocket;
@@ -56,7 +53,7 @@ public class BftFabricProxy {
     private static Map<String, DataOutputStream> outputs;
     private static Map<String, Timer> timers;
 
-//    private static Map<String, Long> BatchTimeout;
+    //    private static Map<String, Long> BatchTimeout;
     private static int frontendID;
     private static int nextID;
 
@@ -85,7 +82,7 @@ public class BftFabricProxy {
     //MISSING: SETUP CHANNELS WITH HONEYBADGER NODES INSTEAD OF SMART-BFT
     public static void main(String args[]) throws ClassNotFoundException, IllegalAccessException, InstantiationException, CryptoException, InvalidArgumentException, NoSuchAlgorithmException, NoSuchProviderException, IOException, InvalidKeySpecException, CertificateException {
 
-        if(args.length < 3) {
+        if (args.length < 3) {
             System.out.println("Use: java bft.miguel.BftFabricProxy <proxy id> <pool size> <send port>");
             System.exit(-1);
         }
@@ -94,14 +91,16 @@ public class BftFabricProxy {
         int pool = Integer.parseInt(args[1]);
         int sendPort = Integer.parseInt(args[2]);
         int honeyBadgerPort = 5000;
-        if(args.length > 2)
+        if (args.length > 3)
             honeyBadgerPort = Integer.parseInt(args[3]);
 
-        Path proxy_ready = FileSystems.getDefault().getPath(System.getProperty("java.io.tmpdir"), "hlf-proxy-"+sendPort+".ready");
+        System.out.println("Fetching hlf proxy...");
+        Path proxy_ready = FileSystems.getDefault().getPath(System.getProperty("java.io.tmpdir"), "hlf-proxy-" + sendPort + ".ready");
 
         Files.deleteIfExists(proxy_ready);
 
         configDir = BFTCommon.getBFTSMaRtConfigDir("FRONTEND_CONFIG_DIR");
+        System.out.println("Config dir: " + configDir);
 
         if (System.getProperty("logback.configurationFile") == null)
             System.setProperty("logback.configurationFile", configDir + "logback.xml");
@@ -117,21 +116,21 @@ public class BftFabricProxy {
         crypto.init();
         BFTCommon.init(crypto);
 
+        blockCutters = new HashMap<>();
 
         fabricHelper = new BFTFabricHelper(frontendID);
-        blockCutters = new HashMap<>();
 
 
         try {
 
             logger.info("Creating UNIX socket...");
 
-            Path socket_file = FileSystems.getDefault().getPath(System.getProperty("java.io.tmpdir"), "hlf-pool-"+sendPort+".sock");
+            Path socket_file = FileSystems.getDefault().getPath(System.getProperty("java.io.tmpdir"), "hlf-pool-" + sendPort + ".sock");
 
             Files.deleteIfExists(socket_file);
 
             //MIGUEL Receive and send server for the orderer tool, NOT THE BFT NODES
-            recvServer = new  UnixDomainSocketServer(socket_file.toString(), JUDS.SOCK_STREAM, pool);
+            recvServer = new UnixDomainSocketServer(socket_file.toString(), JUDS.SOCK_STREAM, pool);
             sendServer = new ServerSocket(sendPort);
 
             FileUtils.touch(proxy_ready.toFile()); //Indicate the Go component that the java component is ready
@@ -159,14 +158,17 @@ public class BftFabricProxy {
 
             new SenderThread().start();
 
-            logger.info("Java component is ready");
 
+            logger.info("Setting up honeybadgerBft connection in port " + honeyBadgerPort +  "...");
             //SETTING UP CONNECTION WITH PYTHON HONEYBADGERBFT
 
             honeyBadgerServer = new ServerSocket(honeyBadgerPort);
             honeyBadgerSocket = honeyBadgerServer.accept();
             honeyBadgerOs = honeyBadgerSocket.getOutputStream();
             honeyBadgerIs = honeyBadgerSocket.getInputStream();
+
+            logger.info("Connected to honeybadger component");
+            logger.info("Java component is ready");
 
             //MIGUEL what are the channels for?
             while (true) { // wait for the creation of new channels
@@ -177,28 +179,13 @@ public class BftFabricProxy {
 
                 channel = readString(is);
 
-                //byte[] bytes = readBytes(is);
-
                 outputs.put(channel, os);
-
-//                BatchTimeout.put(channel, readLong(is));
-
-//                logger.info("Read BatchTimeout: " + BatchTimeout.get(channel));
-
-                //sysProxy.invokeAsynchRequest(BFTUtil.assembleSignedRequest(sysProxy.getViewManager().getStaticConf().getRSAPrivateKey(), "NEWCHANNEL", channel, bytes), null, TOMMessageType.ORDERED_REQUEST);
-
-//                Timer timer = new Timer();
-//                timer.schedule(new BftFabricProxy.BatchTimeout(channel), (BatchTimeout.get(channel) / 1000000));
-//                timers.put(channel, timer);
 
                 logger.info("Setting up system for new channel '" + channel + "'");
 
                 nextID++;
 
             }
-
-
-
 
 
         } catch (IOException e) {
@@ -275,14 +262,6 @@ public class BftFabricProxy {
 
     }
 
-    private static synchronized void resetTimer(String channel) {
-
-//        if (timers.get(channel) != null) timers.get(channel).cancel();
-//        Timer timer = new Timer();
-//        timer.schedule(new BftFabricProxy.BatchTimeout(channel), (BatchTimeout.get(channel) / 1000000));
-//        timers.put(channel, timer);
-    }
-
 
     //MIGUEL Used to receive transactions from orderer library. It packages them to format known by BFTSmart
     private static class ReceiverThread extends Thread {
@@ -290,37 +269,12 @@ public class BftFabricProxy {
         private int id;
         private UnixDomainSocket recv;
         private DataInputStream input;
-        private AsynchServiceProxy out;
 
         public ReceiverThread(UnixDomainSocket recv, int id) throws IOException {
 
             this.id = id;
             this.recv = recv;
             this.input = new DataInputStream(this.recv.getInputStream());
-
-            this.out = new AsynchServiceProxy(this.id, configDir, new KeyLoader() {
-                @Override
-                public PublicKey loadPublicKey(int i) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, CertificateException {
-                    return null;
-                }
-
-                @Override
-                public PublicKey loadPublicKey() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, CertificateException {
-                    return null;
-                }
-
-                @Override
-                public PrivateKey loadPrivateKey() throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
-                    return null;
-                }
-
-                @Override
-                public String getSignatureAlgorithm() {
-                    return null;
-                }
-
-            }, Security.getProvider("BC"));
-
         }
 
         public void run() {
@@ -333,12 +287,12 @@ public class BftFabricProxy {
 
                 try {
 
+
                     channelID = readString(this.input);
                     isConfig = readBoolean(this.input);
                     envelope = readBytes(this.input);
 
-                    resetTimer(channelID);
-
+                    System.out.println("Received envelope" + " for channel id " + channelID + (isConfig ? " (type config)" : " (type normal)"));
                     logger.debug("Received envelope" + Arrays.toString(envelope) + " for channel id " + channelID + (isConfig ? " (type config)" : " (type normal)"));
 
 
@@ -350,18 +304,19 @@ public class BftFabricProxy {
 
                     Common.Block block = null;
 
-                    if(isConfig) {
+                    if (isConfig) {
                         Configtx.ConfigUpdateEnvelope confEnv = Configtx.ConfigUpdateEnvelope.parseFrom(payload.getData());
 
                         Configtx.ConfigUpdate confUpdate = Configtx.ConfigUpdate.parseFrom(confEnv.getConfigUpdate());
+                        System.out.println("confUpdate channelId is " + confUpdate.getChannelId());
                         boolean isConfigUpdate = confUpdate.getChannelId().equals(channelID);
 
                         if (isConfigUpdate)
                             block = fabricHelper.processConfig(channelID, env, confEnv);
 
-                        //In case we have a sysChannel update
+                            //In case we have a sysChannel update
                         else if (!isConfigUpdate && channelID.equals(fabricHelper.getSysChannel())) {
-                            block = fabricHelper.processSysConfig(channelID, env, confEnv);
+                            block = fabricHelper.processSysConfig(channelID, env, confEnv, confUpdate);
 
                         } else {
 
@@ -373,8 +328,7 @@ public class BftFabricProxy {
                         fabricHelper.addBlock(channelID, block);
                         sendNewBlock(channelID, block);
 
-                    }
-                    else {
+                    } else {
                         EnvelopeWrapper envWrapper = fabricHelper.convertEnvelope(channelID, envelope);
                         envWrapper.sendEnvelope(honeyBadgerOs);
                     }
@@ -395,6 +349,7 @@ public class BftFabricProxy {
             }
         }
     }
+
     //MIGUEL SenderThread is used to forward blocks to the hyperledger orderer tool. It packages the blocks from BFTNode to hyperledger-ready format
     private static class SenderThread extends Thread {
 
@@ -403,6 +358,10 @@ public class BftFabricProxy {
             while (true) {
                 try {
 
+                    if(honeyBadgerIs == null) {
+                        Thread.sleep(1000);
+                        continue;
+                    }
                     //@TODO Receive envelopes and form a block with it
                     EnvelopeWrapper envelope = EnvelopeWrapper.fromStream(honeyBadgerIs);
 
@@ -416,7 +375,7 @@ public class BftFabricProxy {
 
                         bc.addEnvelope(envelope);
 
-                        if(bc.isBlock()) {
+                        if (bc.isBlock()) {
                             Common.Block block = fabricHelper.createBlock(channelID, bc.cutBlock());
                             sendNewBlock(channelID, block);
                             //                        os.write(isConfig ? (byte) 1 : (byte) 0);
@@ -436,6 +395,8 @@ public class BftFabricProxy {
                     e.printStackTrace();
                 } catch (NoSuchProviderException e) {
                     e.printStackTrace();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
             }
         }
@@ -445,6 +406,8 @@ public class BftFabricProxy {
 
     //Used to send block to orderer library
     private static void sendNewBlock(String channelID, Common.Block block) {
+        System.out.println("Sending block to channel id " + channelID);
+
         byte[] bytes = block.toByteArray();
         DataOutputStream os = outputs.get(channelID);
 
@@ -457,34 +420,5 @@ public class BftFabricProxy {
             e.printStackTrace();
         }
     }
-
-/*    private static class BatchTimeout extends TimerTask {
-
-        String channel;
-
-        BatchTimeout(String channel) {
-
-            this.channel = channel;
-        }
-
-        @Override
-        public void run() {
-
-            try {
-                int reqId = sysProxy.invokeAsynchRequest(BFTCommon.assembleSignedRequest(sysProxy.getViewManager().getStaticConf().getPrivateKey(), frontendID, "TIMEOUT", this.channel,new byte[0]), null, TOMMessageType.ORDERED_REQUEST);
-                sysProxy.cleanAsynchRequest(reqId);
-
-                Timer timer = new Timer();
-                timer.schedule(new BFTProxy.BatchTimeout(this.channel), (BatchTimeout.get(channel) / 1000000));
-
-                timers.put(this.channel, timer);
-            } catch (IOException ex) {
-                logger.error("Failed to send envelope to nodes", ex);
-            }
-
-        }
-
-    }*/
-
 
 }

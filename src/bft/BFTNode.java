@@ -423,7 +423,7 @@ public class BFTNode extends DefaultRecoverable {
             if (mspmanager.length > 0) out.write(mspmanager);
             out.flush();
             bos.flush();
-            
+
             out.close();
             bos.close();
             

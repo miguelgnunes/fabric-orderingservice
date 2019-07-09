@@ -12,5 +12,7 @@ RUN apt-get -y install openjdk-8-jre
 
 ADD temp/config /etc/bftsmart-orderer/config
 ADD temp/lib /etc/bftsmart-orderer/lib
-ADD temp/BFT-Proxy.jar /etc/bftsmart-orderer/bin/orderingservice.jar
+ADD temp/BftFabricProxy.jar /etc/bftsmart-orderer/bin/orderingservice.jar
+#RUN apt-get -y install unzip
+#RUN unzip -l /etc/bftsmart-orderer/bin/orderingservice.jar
 ADD temp/genesisblock /etc/bftsmart-orderer/config/genesisblock

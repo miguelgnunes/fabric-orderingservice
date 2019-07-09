@@ -1,4 +1,4 @@
-FROM hyperledger/fabric-tools:amd64-1.3.0
+FROM hyperledger/fabric-tools:amd64-1.2.0
 
 RUN apt-get update
 RUN apt-get install -y nano jq
@@ -47,7 +47,7 @@ RUN apt-get -y install openjdk-8-jre
 
 ADD temp/config /etc/bftsmart-orderer/config
 ADD temp/lib /etc/bftsmart-orderer/lib
-ADD temp/BFT-Proxy.jar /etc/bftsmart-orderer/bin/orderingservice.jar
+ADD temp/BftFabricProxy.jar /etc/bftsmart-orderer/bin/orderingservice.jar
 
 RUN echo "#!/bin/bash" > /usr/local/bin/startWorkload.sh
 RUN echo "cd /etc/bftsmart-orderer/" >> /usr/local/bin/startWorkload.sh

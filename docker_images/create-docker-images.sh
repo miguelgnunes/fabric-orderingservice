@@ -52,7 +52,7 @@ function main() {
 
 	rm ./temp/*
 
-	cp ../dist/BFT-Proxy.jar ./temp
+	cp ../dist/BftFabricProxy.jar ./temp
 	cp -r ../config ./temp/config
 	cp -r ../lib ./temp/lib
 	mkdir ./temp/fabric_conf
@@ -89,7 +89,7 @@ function main() {
 
 	docker rm -v $id
 
-	docker-compose build common orderingnode frontend peer
+	docker-compose build common frontend peer
 
 	create_fabric_core
 	create_update_frontend_entrypoint_script
@@ -129,7 +129,7 @@ function main () {
 
 	eval $(parse_yaml /etc/hyperledger/fabric/orderer.yaml "orderer_")
 
-	java -cp bin/orderingservice.jar:lib/* bft.BFTProxy $1 $orderer_BFTsmart_ConnectionPoolSize $orderer_BFTsmart_RecvPort &
+	java -cp bin/orderingservice.jar:lib/* bft.miguel.BftFabricProxy $1 $orderer_BFTsmart_ConnectionPoolSize $orderer_BFTsmart_RecvPort 5001 &
 	sleep 2
 	orderer start
 
@@ -166,7 +166,8 @@ echo ""
 echo "Fetching genesis block for channel47"
 echo ""
 
-peer channel fetch 0 ./channel47.block -c channel47 -o bft.frontend.2000:7050
+#peer channel fetch 0 ./channel47.block -c channel47 -o bft.frontend.2000:7050
+peer channel fetch 0 ./channel47.block -c channel47 -o bft.frontend.1000:7050
 
 echo ""
 echo "Joining the peer to the channel"
@@ -564,7 +565,7 @@ Orderer: &OrdererDefaults
     # NOTE: In the solo case, this should be a one-item list.
     Addresses:
         - bft.frontend.1000:7050
-        - bft.frontend.2000:7050
+#        - bft.frontend.2000:7050
 
     # Batch Timeout: The amount of time to wait before creating a batch.
     BatchTimeout: 2s

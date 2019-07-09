@@ -2,14 +2,9 @@ FROM hyperledger/fabric-orderer:amd64-1.3.0
 
 RUN apt-get update
 RUN apt-get -y install python-software-properties debconf-utils git-all build-essential python-pip python-dev curl libc6-dev-i386 autoconf software-properties-common apt-utils
-#RUN add-apt-repository ppa:webupd8team/java
-#RUN apt-get update
 
-#RUN echo "oracle-java7-installer shared/accepted-oracle-license-v1-1 select true" | debconf-set-selections
-#RUN apt-get install -y oracle-java8-installer
 
 ADD temp/jdk1.8.0_211 /jdk1.8.0_211
-RUN ls
 RUN mkdir /opt/java
 RUN mv /jdk1.8.0_211 /opt/java/
 RUN ln -s /opt/java/jdk1.8.0_211/ /opt/java/current
