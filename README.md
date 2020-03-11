@@ -11,7 +11,7 @@ How to run our custom-made frontend:
 1. From the project base folder, Run
 ```bash
 cd docker_images
-./create-docker-images.sh bftchannel clean
+$ ./create-docker-images.sh bftchannel clean
 ```
 
 This will build BftFabricProxy Java component from scratch, and create all the necessary Docker images to run the system
@@ -20,7 +20,7 @@ This will build BftFabricProxy Java component from scratch, and create all the n
 
 3. Start the Frontend docker component
 ```bash
-$ docker run -i -t --rm --network=bft_network --name=bft.frontend.1000 bftsmart/fabric-frontend:amd64-1.3.0 1000 1 5000
+$ docker run -i -t --rm --network=bftchannel --name=bft.frontend.1000 bftsmart/fabric-frontend:amd64-1.3.0 1000 1 5000
 ```
 
 The Frontend is now running identified as *bft.frontend.1000* in the *bftchannel* network. **1000** is the frontend id, **1** is the number of threads relaying envelopes to the Proxy and **5000** is the port where the consensus algorithm is listening to.
