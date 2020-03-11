@@ -78,11 +78,10 @@ public class BftFabricProxy {
     private static final int countSigs = 0;
 
 
-    //MISSING: SETUP CHANNELS WITH HONEYBADGER NODES INSTEAD OF SMART-BFT
     public static void main(String args[]) throws ClassNotFoundException, IllegalAccessException, InstantiationException, CryptoException, InvalidArgumentException, NoSuchAlgorithmException, NoSuchProviderException, IOException, InvalidKeySpecException, CertificateException {
 
         if(args.length < 3) {
-            System.out.println("Use: java bft.BFTProxy <proxy id> <pool size> <send port>");
+            System.out.println("Use: java bft.miguel.BftFabricProxy <proxy id> <pool size> <send port>");
             System.exit(-1);
         }
 
@@ -307,9 +306,7 @@ public class BftFabricProxy {
                     logger.debug("Received envelope" + Arrays.toString(envelope) + " for channel id " + channelID + (isConfig ? " (type config)" : " (type normal)"));
 
 
-                    //MIGUEL After receiving new envelope from orderer, checks if it's config. If not, sends to BFT
-
-
+                    //After receiving new envelope from orderer, checks if it's config. If not, sends to BFT
                     Common.Envelope env = Common.Envelope.parseFrom(envelope);
                     Common.Payload payload = Common.Payload.parseFrom(env.getPayload());
 
@@ -365,7 +362,7 @@ public class BftFabricProxy {
         }
     }
 
-    //MIGUEL SenderThread is used to forward blocks to the hyperledger orderer tool. It packages the blocks from BFTNode to hyperledger-ready format
+    //SenderThread is used to forward blocks to the hyperledger orderer tool. It packages the blocks from BFTNode to hyperledger-ready format
     private static class SenderThread extends Thread {
 
         public void run() {
