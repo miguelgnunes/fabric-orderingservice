@@ -16,13 +16,13 @@ cd docker_images
 
 This will build BftFabricProxy Java component from scratch, and create all the necessary Docker images to run the system
 
-2. Run the Consensus algorithm component independently. This component needs to listen for connections in a given port and indeterminally await transactions. These transactions are to be treated by the consensus algorithm as raw data, with no particular structure. The size of the payload of each transaction is encoded in the first 8 bytes of each message sent by the Frontend.
+2. Run the Consensus algorithm component independently, like our adapted [HoneybadgerBFT](https://github.com/miguelgnunes/HoneyBadgerBFT-Python.git). This component needs to listen for connections in a given port -- let's choose **5000** for this example -- and indeterminally await envelopes. These envelopes are to be treated by the consensus algorithm as raw data, with no particular structure. The size of the payload of each envelope is encoded in the first 8 bytes of each message sent by the Frontend.
 
 3. Start the Frontend docker component
 ```bash
-
+$ docker run -i -t --rm --network=bft_network --name=bft.frontend.1000 bftsmart/fabric-frontend:amd64-1.3.0 1000 1 5000
 ```
 
-To get started, check out the [overview page](https://github.com/bft-smart/fabric-orderingservice/wiki/Overview) and our [quick start guide](https://github.com/bft-smart/fabric-orderingservice/wiki/Quick-Start-v1.3). You can also [learn to compile the code](https://github.com/bft-smart/fabric-orderingservice/wiki/Compiling). For a more in-dept look at how to configure a distributed deployment with this ordering service, you can [read our guide](https://github.com/bft-smart/fabric-orderingservice/wiki/Configuring-a-deployment-v1.3). For an in-depth look at the ordering service architecture and performance, check out the [DSN'18 paper](http://www.di.fc.ul.pt/~bessani/publications/dsn18-hlfsmart.pdf).
+The Frontend is now running identified as *bft.frontend.1000* in the *bftchannel* network. **1000** is the frontend id, **1** is the number of threads relaying envelopes to the Proxy and **5000** is the port where the consensus algorithm is listening to.
 
-***Feel free to contact us if you have any questions!***
+You now have an ordering node available in the *bftchannel* network. To setup the rest of the Fabric network for testing purposes, we refer to BFT-SMaRt authors' [quick start guide](https://github.com/bft-smart/fabric-orderingservice/wiki/Quick-Start-v1.3).
