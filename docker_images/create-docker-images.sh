@@ -129,7 +129,7 @@ function main () {
 
 	eval $(parse_yaml /etc/hyperledger/fabric/orderer.yaml "orderer_")
 
-	java -cp bin/orderingservice.jar:lib/* bft.miguel.BftFabricProxy $1 $orderer_BFTsmart_ConnectionPoolSize $orderer_BFTsmart_RecvPort 5001 &
+	java -cp bin/orderingservice.jar:lib/* bft.miguel.BftFabricProxy $1 $orderer_BFTsmart_ConnectionPoolSize $orderer_BFTsmart_RecvPort $2 &
 	sleep 2
 	orderer start
 
