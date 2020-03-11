@@ -1,7 +1,9 @@
 package bft.miguel;
 
+import bft.BFTProxy;
 import bft.util.BFTCommon;
 import bftsmart.tom.AsynchServiceProxy;
+import bftsmart.tom.core.messages.TOMMessageType;
 import bftsmart.tom.util.KeyLoader;
 import com.etsy.net.JUDS;
 import com.etsy.net.UnixDomainSocket;
@@ -53,7 +55,8 @@ public class BftFabricProxy {
     private static Map<String, DataOutputStream> outputs;
     private static Map<String, Timer> timers;
 
-    //    private static Map<String, Long> BatchTimeout;
+    private static int orderingID;
+    private static Map<String, Long> BatchTimeout;
     private static int frontendID;
     private static int nextID;
 
@@ -75,15 +78,11 @@ public class BftFabricProxy {
     private static final int countSigs = 0;
 
 
-    //This is the default channel that will be used, as per the first connection from an orderer
-    //This is for testing purposes only, as this Proxy library should adapt to multiple channels
-    private static String channel;
-
     //MISSING: SETUP CHANNELS WITH HONEYBADGER NODES INSTEAD OF SMART-BFT
     public static void main(String args[]) throws ClassNotFoundException, IllegalAccessException, InstantiationException, CryptoException, InvalidArgumentException, NoSuchAlgorithmException, NoSuchProviderException, IOException, InvalidKeySpecException, CertificateException {
 
-        if (args.length < 3) {
-            System.out.println("Use: java bft.miguel.BftFabricProxy <proxy id> <pool size> <send port>");
+        if(args.length < 3) {
+            System.out.println("Use: java bft.BFTProxy <proxy id> <pool size> <send port>");
             System.exit(-1);
         }
 
@@ -154,7 +153,7 @@ public class BftFabricProxy {
 
             outputs = new TreeMap<>();
             timers = new TreeMap<>();
-//            BatchTimeout = new TreeMap<>();
+            BatchTimeout = new TreeMap<>();
 
             new SenderThread().start();
 
@@ -177,9 +176,21 @@ public class BftFabricProxy {
 
                 DataOutputStream os = new DataOutputStream(sendSocket.getOutputStream());
 
-                channel = readString(is);
+                String channel = readString(is);
+
+//                BatchTimeout.put(channel, readLong(is));
+//                readLong(is);
 
                 outputs.put(channel, os);
+
+                BatchTimeout.put(channel, readLong(is));
+
+                logger.info("Read BatchTimeout: " + BatchTimeout.get(channel));
+
+                Timer timer = new Timer();
+                timer.schedule(new BftFabricProxy.BatchTimeout(channel), (BatchTimeout.get(channel) / 1000000));
+                timers.put(channel, timer);
+
 
                 logger.info("Setting up system for new channel '" + channel + "'");
 
@@ -320,17 +331,21 @@ public class BftFabricProxy {
 
                         } else {
 
-                            String msg = "Envelope contained channel creation request, but was submitted to a non-system channel (" + channel + ")";
+                            String msg = "Envelope contained channel creation request, but was submitted to a non-system channel (" + channelID + ")";
                             logger.info(msg);
                             throw new BFTCommon.BFTException(msg);
                         }
 
                         fabricHelper.addBlock(channelID, block);
-                        sendNewBlock(channelID, block);
+                        sendNewBlock(channelID, block, true);
 
                     } else {
                         EnvelopeWrapper envWrapper = fabricHelper.convertEnvelope(channelID, envelope);
-                        envWrapper.sendEnvelope(honeyBadgerOs);
+                        try {
+                            envWrapper.sendEnvelope(honeyBadgerOs);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
                     }
 
 
@@ -377,7 +392,7 @@ public class BftFabricProxy {
 
                         if (bc.isBlock()) {
                             Common.Block block = fabricHelper.createBlock(channelID, bc.cutBlock());
-                            sendNewBlock(channelID, block);
+                            sendNewBlock(channelID, block, false);
                             //                        os.write(isConfig ? (byte) 1 : (byte) 0);
                         }
                     }
@@ -404,8 +419,17 @@ public class BftFabricProxy {
     }
 
 
+    private static void sendNewBlock(String channelID, boolean isConfig) throws InvalidKeyException, NoSuchAlgorithmException, IOException, BFTCommon.BFTException, SignatureException, NoSuchProviderException, CryptoException {
+        BlockCutter bc = blockCutters.get(channelID);
+        List<EnvelopeWrapper> envelopeWrappers = bc.cutBlock();
+        if(envelopeWrappers.size() > 0) {
+            Common.Block block = fabricHelper.createBlock(channelID, envelopeWrappers);
+            sendNewBlock(channelID, block, isConfig);
+        }
+
+    }
     //Used to send block to orderer library
-    private static void sendNewBlock(String channelID, Common.Block block) {
+    private static void sendNewBlock(String channelID, Common.Block block, boolean isConfig) {
         System.out.println("Sending block to channel id " + channelID);
 
         byte[] bytes = block.toByteArray();
@@ -415,10 +439,52 @@ public class BftFabricProxy {
             os.writeLong(bytes.length);
             os.write(bytes);
             os.writeLong(1);
-            os.write((byte) 0);
+            os.write(isConfig ? (byte) 1 : (byte) 0);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+        System.out.println("Block sent");
+    }
+
+    private static class BatchTimeout extends TimerTask {
+
+        String channel;
+
+        BatchTimeout(String channel) {
+
+            this.channel = channel;
+        }
+
+        @Override
+        public void run() {
+
+            try {
+                sendNewBlock(this.channel, false);
+
+                Timer timer = new Timer();
+                timer.schedule(new BftFabricProxy.BatchTimeout(this.channel), (BatchTimeout.get(channel) / 1000000));
+
+                timers.put(this.channel, timer);
+            } catch (IOException ex) {
+                logger.error("Failed to send envelope to nodes", ex);
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            } catch (InvalidKeyException e) {
+                e.printStackTrace();
+            } catch (SignatureException e) {
+                e.printStackTrace();
+            } catch (CryptoException e) {
+                e.printStackTrace();
+            } catch (BFTCommon.BFTException e) {
+                e.printStackTrace();
+            } catch (NoSuchProviderException e) {
+                e.printStackTrace();
+            }
+
+        }
+
     }
 
 }

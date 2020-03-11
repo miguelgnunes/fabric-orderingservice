@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.*;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
@@ -34,7 +35,8 @@ import java.util.*;
  */
 public class BFTFabricHelper {
 
-    private final Logger logger;
+    private Logger logger;
+    private int orderingID;
 
     private MSPManager mspManager;
 
@@ -54,24 +56,23 @@ public class BFTFabricHelper {
     private String sysChannel;
     private String configDir;
 
-    private X509Certificate certificate = null;
-    private PrivateKey privKey = null;
-        private byte[] serializedCert = null;
-    private Identities.SerializedIdentity ident;
+    MyECDSA frotendECDSA;
+    LinkedList<MyECDSA> orderingECDSAs;
 
 
     private int id;
 
-    private final CryptoPrimitives crypto;
+    private CryptoPrimitives crypto;
     private Map<String,Common.BlockHeader> lastBlockHeaders;
 
     private FabricState fabricState;
     Random rand = new Random(System.nanoTime());
 
 
-    public BFTFabricHelper(int id) throws NoSuchProviderException, NoSuchAlgorithmException, CryptoException, InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException, IOException, InvalidKeySpecException, CertificateException {
+    public BFTFabricHelper(int frontendID) throws NoSuchProviderException, NoSuchAlgorithmException, CryptoException, InvalidArgumentException, IllegalAccessException, InstantiationException, ClassNotFoundException, IOException, InvalidKeySpecException, CertificateException {
         //@TODO This id is used to retrieve ECDSA keys. These keys are copied to BFTNode docker but not BFTProxy. This is missing
-        this.id = id;
+        this.id = frontendID;
+        this.orderingID = orderingID;
 
         try {
             loadConfig();
@@ -89,11 +90,12 @@ public class BFTFabricHelper {
         this.crypto = new CryptoPrimitives();
         this.crypto.init();
 
-        ECDSAKeyLoader loader = new ECDSAKeyLoader(this.id, this.configDir, this.crypto.getProperties().getProperty(Config.SIGNATURE_ALGORITHM));
-        privKey = loader.loadPrivateKey();
-        certificate = loader.loadCertificate();
-        serializedCert = BFTCommon.getSerializedCertificate(certificate);
-        ident = BFTCommon.getSerializedIdentity(mspid, serializedCert);
+
+        frotendECDSA = new MyECDSA(this.id, this.configDir, this.crypto.getProperties().getProperty(Config.SIGNATURE_ALGORITHM));
+        orderingECDSAs = new LinkedList<>();
+        for(int i = 0; i < 4; i++) {
+            orderingECDSAs.add(new MyECDSA(i, this.configDir,this.crypto.getProperties().getProperty(Config.SIGNATURE_ALGORITHM)));
+        }
 
         BFTCommon.init(crypto);
 
@@ -167,6 +169,7 @@ public class BFTFabricHelper {
 
 
     public void addBlock(String channelID, Common.Block block) {
+        System.out.println("Adding block " + block.getHeader().getNumber() + " to channel " + channelID);
         fabricState.addBlock(channelID, block);
         lastBlockHeaders.put(channelID, block.getHeader());
     }
@@ -198,32 +201,9 @@ public class BFTFabricHelper {
 
         nextBlock = nextBlock.toBuilder().setData(filtered).build();
 
-//        Common.Block block = Common.Block.getDefaultInstance();
-//        block.toBuilder().setData(filtered).build();
-//        block.
+        nextBlock = doSignature(nextBlock, channelID);
 
-        byte[] nonces = new byte[rand.nextInt(10)];
-        rand.nextBytes(nonces);
-        //create signatures
-        Common.Metadata blockSig = BFTCommon.createMetadataSignature(privKey, ident.toByteArray(), nonces, null, nextBlock.getHeader());
-        Common.Metadata configSig = null;
-
-        Common.LastConfig.Builder last = Common.LastConfig.newBuilder();
-        last.setIndex(mspManager.getLastConfig(channelID));
-
-        if (bothSigs) {
-
-            configSig = BFTCommon.createMetadataSignature(privKey, ident.toByteArray(), nonces, last.build().toByteArray(), nextBlock.getHeader());
-        } else {
-
-            Common.MetadataSignature.Builder dummySig =
-                    Common.MetadataSignature.newBuilder().setSignature(ByteString.EMPTY).setSignatureHeader(ByteString.EMPTY);
-
-            configSig = Common.Metadata.newBuilder().setValue(last.build().toByteString()).addSignatures(dummySig).build();
-
-        }
-
-        fabricState.addBlock(channelID, nextBlock);
+        addBlock(channelID, nextBlock);
         return nextBlock;
     }
 
@@ -260,7 +240,9 @@ public class BFTFabricHelper {
 
         updateChannel(mspManager, channelID, block.getHeader().getNumber(), newConfEnv, newConfig, timestamp);
 
-        lastBlockHeaders.put(channelID, block.getHeader());
+        block = doSignature(block, channelID);
+
+        addBlock(channelID, block);
 
         return block;
     }
@@ -302,9 +284,9 @@ public class BFTFabricHelper {
 
         newChannel(mspManager, lastBlockHeaders, confUpdate.getChannelId(), genesis, timestamp);
 
-        addBlock(channelID, block);
+        block = doSignature(block, channelID);
 
-        lastBlockHeaders.put(channelID, block.getHeader());
+        addBlock(channelID, block);
 
         return block;
     }
@@ -397,5 +379,101 @@ public class BFTFabricHelper {
 
     public String getSysChannel() {
         return sysChannel;
+    }
+
+
+    private Common.Block doSignature(Common.Block nextBlock, String channelID) {
+        byte[] nonces = new byte[rand.nextInt(10)];
+        rand.nextBytes(nonces);
+        Common.LastConfig.Builder last = Common.LastConfig.newBuilder();
+        last.setIndex(mspManager.getLastConfig(channelID));
+
+        Common.Metadata.Builder allBlockSig = Common.Metadata.newBuilder();
+        Common.Metadata.Builder allConfigSig = Common.Metadata.newBuilder();
+
+        System.out.println("Adding signatures for " + orderingECDSAs.size() + " ordering nodes...");
+        try {
+            for(MyECDSA ecdsa : orderingECDSAs) {
+                //create signatures
+                Common.Metadata blockSig = null;
+                blockSig = BFTCommon.createMetadataSignature(ecdsa.privKey, ecdsa.ident.toByteArray(), nonces, null, nextBlock.getHeader());
+
+                allBlockSig.addSignatures(blockSig.getSignatures(0));
+
+                Common.Metadata configSig = null;
+
+                if (bothSigs) {
+                    configSig = BFTCommon.createMetadataSignature(ecdsa.privKey, ecdsa.ident.toByteArray(), nonces, last.build().toByteArray(), nextBlock.getHeader());
+
+                }
+                else {
+                    Common.MetadataSignature.Builder dummySig =
+                            Common.MetadataSignature.newBuilder().setSignature(ByteString.EMPTY).setSignatureHeader(ByteString.EMPTY);
+
+                    configSig = Common.Metadata.newBuilder().setValue(last.build().toByteString()).addSignatures(dummySig).build();
+                }
+
+                allConfigSig.addSignatures(configSig.getSignatures(0));
+
+            }
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        } catch (NoSuchProviderException e) {
+            e.printStackTrace();
+        } catch (InvalidKeyException e) {
+            e.printStackTrace();
+        } catch (SignatureException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (CryptoException e) {
+            e.printStackTrace();
+        } catch (BFTCommon.BFTException e) {
+            e.printStackTrace();
+        }
+
+
+        Common.BlockMetadata.Builder blockMetadata = nextBlock.getMetadata().toBuilder();
+
+        blockMetadata.setMetadata(Common.BlockMetadataIndex.SIGNATURES_VALUE, allBlockSig.build().toByteString());
+        blockMetadata.setMetadata(Common.BlockMetadataIndex.LAST_CONFIG_VALUE, allConfigSig.build().toByteString());
+
+        nextBlock = nextBlock.toBuilder().setMetadata(blockMetadata).build();
+
+        return nextBlock;
+    }
+
+
+
+    public class MyECDSA {
+
+        public PrivateKey privKey;
+        public ECDSAKeyLoader loader;
+        public X509Certificate certificate = null;
+        public byte[] serializedCert = null;
+        public Identities.SerializedIdentity ident;
+
+        public MyECDSA(int id, String configDir, String signatureProperty) {
+
+            loader = new ECDSAKeyLoader(id, configDir, signatureProperty);
+
+            try {
+                privKey = loader.loadPrivateKey();
+                certificate = loader.loadCertificate();
+                serializedCert = BFTCommon.getSerializedCertificate(certificate);
+                ident = BFTCommon.getSerializedIdentity(mspid, serializedCert);
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            } catch (InvalidKeySpecException e) {
+                e.printStackTrace();
+            } catch (CertificateEncodingException e) {
+                e.printStackTrace();
+            } catch (CertificateException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

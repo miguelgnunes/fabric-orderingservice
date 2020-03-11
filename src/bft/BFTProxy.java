@@ -70,6 +70,7 @@ public class BFTProxy {
     private static Map<String, Timer> timers;
 
     private static Map<String, Long> BatchTimeout;
+    private static int orderingID;
     private static int frontendID;
     private static int nextID;
 
@@ -90,8 +91,8 @@ public class BFTProxy {
 
     public static void main(String args[]) throws ClassNotFoundException, IllegalAccessException, InstantiationException, CryptoException, InvalidArgumentException, NoSuchAlgorithmException, NoSuchProviderException, IOException {
             
-        if(args.length < 3) {
-            System.out.println("Use: java bft.BFTProxy <proxy id> <pool size> <send port>");
+        if(args.length < 4) {
+            System.out.println("Use: java bft.BFTProxy <proxy id> <ordering id> <pool size> <send port>");
             System.exit(-1);
         }    
         
@@ -110,7 +111,8 @@ public class BFTProxy {
         Security.addProvider(new BouncyCastleProvider());
                 
         BFTProxy.logger = LoggerFactory.getLogger(BFTProxy.class);
-        
+
+        orderingID = Integer.parseInt(args[1]);
         frontendID = Integer.parseInt(args[0]);
         nextID = frontendID + 1;
         

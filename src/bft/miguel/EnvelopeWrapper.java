@@ -3,10 +3,8 @@ package bft.miguel;
 import bft.miguel.proto.Envelopewrapper;
 import org.hyperledger.fabric.protos.common.Common;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.Serializable;
+import java.io.*;
+import java.nio.ByteBuffer;
 import java.util.Date;
 
 /**
@@ -57,8 +55,34 @@ public class EnvelopeWrapper implements Serializable {
         return new EnvelopeWrapper(Envelopewrapper.EnvelopeWrapper.parseDelimitedFrom(is));
     }
 
+    public static String print(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[ ");
+        for (byte b : bytes) {
+            sb.append(String.format("0x%02X ", b));
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
     public void sendEnvelope(OutputStream os) throws IOException {
-        this.envWrapper.writeDelimitedTo(os);
+        byte[] byteArray = this.envWrapper.toByteArray();
+        int size = byteArray.length;
+        System.out.println("Sending envelope with size " + size);
+        System.out.println(print(ByteBuffer.allocate(4).putInt(size).array()));
+
+        DataOutputStream dataOutputStream = new DataOutputStream(os);
+
+        synchronized(EnvelopeWrapper.class) {
+            dataOutputStream.writeInt(size);
+            dataOutputStream.flush();
+            dataOutputStream.write(byteArray);
+            dataOutputStream.flush();
+        }
+
+//        System.out.println(this.envWrapper.toByteString().toStringUtf8());
+
+//        this.envWrapper.writeDelimitedTo(os);
     }
 
     public Common.Envelope getEnvelope() {
