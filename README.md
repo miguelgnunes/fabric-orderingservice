@@ -10,7 +10,7 @@ How to run our custom-made frontend:
 
 1. From the project base folder, Run
 ```bash
-cd docker_images
+$ cd docker_images
 $ ./create-docker-images.sh bftchannel clean
 ```
 
